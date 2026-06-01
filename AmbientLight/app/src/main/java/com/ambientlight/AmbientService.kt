@@ -18,6 +18,13 @@ import java.nio.ByteBuffer
 
 class AmbientService : Service() {
 
+    var logListener: ((String) -> Unit)? = null
+
+    fun log(message: String) {
+        android.util.Log.d("AmbientLight", message)
+        logListener?.invoke(message)
+    }
+
     companion object {
         const val ACTION_START       = "com.ambientlight.START"
         const val EXTRA_RESULT_CODE  = "result_code"
