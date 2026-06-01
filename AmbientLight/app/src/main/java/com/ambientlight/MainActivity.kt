@@ -63,18 +63,53 @@ class MainActivity : AppCompatActivity() {
                 logScroll.post { logScroll.fullScroll(ScrollView.FOCUS_DOWN) }
             }
         }
+        if (AmbientService.logBuffer.isNotEmpty()) {
+            AmbientService.logBuffer.forEach { line ->
+                logText.append("$line\n")
+            }
+            logScroll.post { logScroll.fullScroll(ScrollView.FOCUS_DOWN) }
+        }
 
         updateUI(AmbientService.isRunning)
     }
 
-    override fun onResume() {
-        super.onResume()
-        updateUI(AmbientService.isRunning)
-    }
+        override fun onResume() {
+            super.onResume()
+            updateUI(AmbientService.isRunning)
+        
+            // re-register listener in case it was cleared
+            AmbientService.logListener = { message ->
+                handler.post {
+                    logText.append("$message\n")
+                    logScroll.post { logScroll.fullScroll(ScrollView.FOCUS_DOWN) }
+                }
+            }
+        
+            AmbientService.colorListener = { smoothed ->
+                val colors = IntArray(AmbientService.TOTAL_LEDS) { i ->
+                    val r = smoothed[i][0].toInt().coerceIn(0, 255)
+                    val g = smoothed[i][1].toInt().coerceIn(0, 255)
+                    val b = smoothed[i][2].toInt().coerceIn(0, 255)
+                    Color.rgb(r, g, b)
+                }
+                handler.post { ledView.updateColors(colors) }
+            }
+        
+            // replay buffer
+            if (AmbientService.logBuffer.isNotEmpty()) {
+                logText.text = ""
+                AmbientService.logBuffer.forEach { line ->
+                    logText.append("$line\n")
+                }
+                logScroll.post { logScroll.fullScroll(ScrollView.FOCUS_DOWN) }
+            }
+        }
 
     override fun onDestroy() {
         super.onDestroy()
-        AmbientService.logListener = null
+        AmbientService.logListener   = null
+        AmbientService.colorListener = null
+        // do NOT clear logBuffer here
     }
 
     private fun updateUI(running: Boolean) {
