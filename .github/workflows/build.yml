@@ -13,14 +13,21 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Setup Gradle wrapper
+        run: |
+          cd AmbientLight
+          gradle wrapper --gradle-version 8.0
+
       - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+        run: chmod +x AmbientLight/gradlew
 
       - name: Build APK
-        run: ./gradlew assembleDebug
+        run: |
+          cd AmbientLight
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: AmbientLight-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: AmbientLight/app/build/outputs/apk/debug/app-debug.apk
