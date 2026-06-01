@@ -18,14 +18,9 @@ import java.nio.ByteBuffer
 
 class AmbientService : Service() {
 
-    var logListener: ((String) -> Unit)? = null
-
-    fun log(message: String) {
-        android.util.Log.d("AmbientLight", message)
-        logListener?.invoke(message)
-    }
 
     companion object {
+
         const val ACTION_START       = "com.ambientlight.START"
         const val EXTRA_RESULT_CODE  = "result_code"
         const val EXTRA_RESULT_DATA  = "result_data"
@@ -45,6 +40,14 @@ class AmbientService : Service() {
 
         val START_BYTE = 0xAA.toByte()
         val END_BYTE   = 0x55.toByte()
+
+
+        var logListener: ((String) -> Unit)? = null
+
+        fun log(message: String) {
+            android.util.Log.d("AmbientLight", message)
+            logListener?.invoke(message)
+        }
     }
 
     private val handler     = Handler(Looper.getMainLooper())
@@ -70,6 +73,7 @@ class AmbientService : Service() {
         if (intent?.action == ACTION_START) {
             startForeground(NOTIF_ID, buildNotification())
             isRunning = true
+            log("Service started @ ${FPS} FPS")
 
             val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
             val resultData = intent.getParcelableExtra<Intent>(EXTRA_RESULT_DATA)!!
@@ -102,6 +106,7 @@ class AmbientService : Service() {
         val drivers = UsbSerialProber.getDefaultProber().findAllDrivers(manager)
 
         if (drivers.isEmpty()) {
+            log("No USB device found, retrying in 2s...")
             handler.postDelayed({ connectUsb() }, 2000)
             return
         }
@@ -111,6 +116,7 @@ class AmbientService : Service() {
 
         if (connection == null) {
             // request permission via broadcast receiver, retry after delay
+            log("USB permission not granted, requesting...")
             val pi = PendingIntent.getBroadcast(
                 this, 0,
                 Intent(UsbReceiver.ACTION_USB_PERMISSION),
@@ -126,7 +132,9 @@ class AmbientService : Service() {
                 port.open(connection)
                 port.setParameters(BAUDRATE, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
             }
+            log("USB connected: ${driver.device.deviceName}")
         } catch (e: Exception) {
+            log("USB open failed: ${e.message}, retrying...")
             handler.postDelayed({ connectUsb() }, 2000)
         }
     }
@@ -254,6 +262,7 @@ class AmbientService : Service() {
         try {
             port.write(packet, 100)
         } catch (e: Exception) {
+            log("Serial write failed: ${e.message}, reconnecting...")
             usbPort = null
             handler.postDelayed({ connectUsb() }, 2000)
         }
