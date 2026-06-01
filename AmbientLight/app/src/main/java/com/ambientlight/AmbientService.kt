@@ -41,11 +41,17 @@ class AmbientService : Service() {
         val START_BYTE = 0xAA.toByte()
         val END_BYTE   = 0x55.toByte()
 
-
+    
         var logListener: ((String) -> Unit)? = null
-
+        var colorListener: ((Array<FloatArray>) -> Unit)? = null
+    
+        // buffer stores last 200 lines
+        val logBuffer = ArrayDeque<String>(200)
+    
         fun log(message: String) {
             android.util.Log.d("AmbientLight", message)
+            if (logBuffer.size >= 200) logBuffer.removeFirst()
+            logBuffer.addLast(message)
             logListener?.invoke(message)
         }
     }
