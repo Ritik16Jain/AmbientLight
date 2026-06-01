@@ -2,6 +2,7 @@ package com.ambientlight
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Color
 import android.media.projection.MediaProjectionManager
 import android.os.Bundle
 import android.os.Handler
@@ -18,6 +19,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var toggleButton: Button
     private lateinit var logText: TextView
     private lateinit var logScroll: ScrollView
+    private lateinit var ledView: LedView
     private lateinit var projectionManager: MediaProjectionManager
 
     private val handler = Handler(Looper.getMainLooper())
@@ -44,6 +46,7 @@ class MainActivity : AppCompatActivity() {
         toggleButton = findViewById(R.id.toggleButton)
         logText      = findViewById(R.id.logText)
         logScroll    = findViewById(R.id.logScroll)
+        ledView      = findViewById(R.id.ledView)
 
         projectionManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
 
@@ -56,60 +59,47 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // register log listener
+        registerListeners()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateUI(AmbientService.isRunning)
+        registerListeners()
+
+        // replay buffered logs
+        if (AmbientService.logBuffer.isNotEmpty()) {
+            logText.text = ""
+            AmbientService.logBuffer.forEach { line ->
+                logText.append("$line\n")
+            }
+            logScroll.post { logScroll.fullScroll(ScrollView.FOCUS_DOWN) }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        AmbientService.logListener   = null
+        AmbientService.colorListener = null
+    }
+
+    private fun registerListeners() {
         AmbientService.logListener = { message ->
             handler.post {
                 logText.append("$message\n")
                 logScroll.post { logScroll.fullScroll(ScrollView.FOCUS_DOWN) }
             }
         }
-        if (AmbientService.logBuffer.isNotEmpty()) {
-            AmbientService.logBuffer.forEach { line ->
-                logText.append("$line\n")
+
+        AmbientService.colorListener = { smoothed ->
+            val colors = IntArray(AmbientService.TOTAL_LEDS) { i ->
+                val r = smoothed[i][0].toInt().coerceIn(0, 255)
+                val g = smoothed[i][1].toInt().coerceIn(0, 255)
+                val b = smoothed[i][2].toInt().coerceIn(0, 255)
+                Color.rgb(r, g, b)
             }
-            logScroll.post { logScroll.fullScroll(ScrollView.FOCUS_DOWN) }
+            handler.post { ledView.updateColors(colors) }
         }
-
-        updateUI(AmbientService.isRunning)
-    }
-
-        override fun onResume() {
-            super.onResume()
-            updateUI(AmbientService.isRunning)
-        
-            // re-register listener in case it was cleared
-            AmbientService.logListener = { message ->
-                handler.post {
-                    logText.append("$message\n")
-                    logScroll.post { logScroll.fullScroll(ScrollView.FOCUS_DOWN) }
-                }
-            }
-        
-            AmbientService.colorListener = { smoothed ->
-                val colors = IntArray(AmbientService.TOTAL_LEDS) { i ->
-                    val r = smoothed[i][0].toInt().coerceIn(0, 255)
-                    val g = smoothed[i][1].toInt().coerceIn(0, 255)
-                    val b = smoothed[i][2].toInt().coerceIn(0, 255)
-                    Color.rgb(r, g, b)
-                }
-                handler.post { ledView.updateColors(colors) }
-            }
-        
-            // replay buffer
-            if (AmbientService.logBuffer.isNotEmpty()) {
-                logText.text = ""
-                AmbientService.logBuffer.forEach { line ->
-                    logText.append("$line\n")
-                }
-                logScroll.post { logScroll.fullScroll(ScrollView.FOCUS_DOWN) }
-            }
-        }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        AmbientService.logListener   = null
-        AmbientService.colorListener = null
-        // do NOT clear logBuffer here
     }
 
     private fun updateUI(running: Boolean) {
